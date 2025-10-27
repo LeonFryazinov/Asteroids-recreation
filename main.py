@@ -159,7 +159,7 @@ class Bullet:
 
         
         self.position = sum_tuple(self.position,mult_tuple(self.velocity,dt))
-        #wn.window_height
+        
         for asteroid in asteroid_list:
             if asteroid.colliding_at_point(self.position):
                 asteroid.kill()
@@ -187,7 +187,10 @@ class Asteroid_preset:
     @staticmethod
     def SMALL():
         return Asteroid_preset(10,10,25,name="SMALL")
-    
+    @staticmethod
+    def RANDOM():
+        r =  random.randint(0,2)
+        return Asteroid_preset.SMALL() if r == 0 else Asteroid_preset.MEDIUM() if r == 1 else Asteroid_preset.LARGE()
 
 
 class Asteroid:
@@ -197,6 +200,7 @@ class Asteroid:
         rad_min = asteroid_shape.rad_min
         rad_max = asteroid_shape.rad_max
         self.shape_name = asteroid_shape.name
+        
         for i in range(edges):
             self.points.append((random.randint(rad_min,rad_max)* math.cos((2*math.pi * i)/edges),random.randint(rad_min,rad_max)* math.sin((2*math.pi * i)/edges)))
         self.position = position
@@ -261,12 +265,19 @@ class Asteroid:
 class Game:
     def __init__(self) -> None:
         self.asteroid_timer = 0.0
+        self.time_next = random.randint(3,5)
         self.asteroids = [Asteroid((-100,0),(-5,0),Asteroid_preset.SMALL()),Asteroid((0,0),(-5,0),Asteroid_preset.MEDIUM()),Asteroid((100,0),(-5,0),Asteroid_preset.LARGE())]
         self.player = Player()
-
-        #there sizes of 
+        self.score = 0
     def update(self,dt,turt):
         turt.clear()
+        self.asteroid_timer -= dt # i stupidly wrote the dt calculation wrong in the begining, meaning that all dt values are inversed.
+        #print(self.asteroid_timer)
+        if self.asteroid_timer > self.time_next:
+            self.time_next = random.randint(3,5)
+            self.asteroid_timer = 0.0
+            self.gen_asteroid()
+            
         for asteroid in self.asteroids:
             asteroid.update(dt,t)
 
@@ -278,6 +289,7 @@ class Game:
         for asteroid in self.asteroids:
             if asteroid.remove:
                 name = asteroid.shape_name
+                pos = asteroid.position
                 vel = asteroid.velocity
                 ang = math.atan2(vel[1],vel[0])
                 new_vel_1 = mult_tuple(vect_from_ang(ang+(math.pi/2)+deg_to_rad(random.randrange(-45,45))),random.randrange(10,30))
@@ -285,11 +297,34 @@ class Game:
                 self.asteroids.remove(asteroid)
                 match name:
                     case "LARGE":
-                        print("Large")
+                        self.score += 100
+                        self.asteroids.append(Asteroid(pos,new_vel_1,Asteroid_preset.MEDIUM()))
+                        self.asteroids.append(Asteroid(pos,new_vel_2,Asteroid_preset.MEDIUM()))
                     case "MEDIUM":
-                        print("medium")
+                        self.score += 200
+                        self.asteroids.append(Asteroid(pos,new_vel_1,Asteroid_preset.SMALL()))
+                        self.asteroids.append(Asteroid(pos,new_vel_2,Asteroid_preset.SMALL()))
                     case "SMALL":
-                        print("small")
+                        self.score += 400
+    def gen_asteroid(self):
+        width = wn.window_width()
+        height = wn.window_height()
+        half_width = width//2
+        half_height = height//2
+        if random.randint(0,1) == 0:
+            x = random.randrange(-half_width-50,half_width+50)
+            y = random.randrange(half_height,half_height+50)
+            y *= -1 if random.randint(0,1) == 0 else 1
+        else:
+            x = random.randrange(half_width,half_width+50)
+            x *= -1 if random.randint(0,1) == 0 else 1
+            y = random.randrange(-half_height-50,half_height+50)
+        
+        target_pos = (random.randint(-half_width+50,half_width-50),random.randint(-half_height+50,half_height-50))
+
+        target_vect = normalise_vect(sub_tuple(target_pos,(x,y)))
+
+        self.asteroids.append(Asteroid((x,y),mult_tuple(target_vect,-random.randint(10,20)),Asteroid_preset.RANDOM()))
 
 
 
