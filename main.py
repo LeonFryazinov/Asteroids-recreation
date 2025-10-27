@@ -19,6 +19,8 @@ def normalise_vect(a:tuple):
     return (a[0]/mod_vect,a[1]/mod_vect)
 def vect_from_ang(a):
     return (math.cos(a),math.sin(a))#normalised
+def deg_to_rad(a):
+    return (a*math.pi)/180
 
 def rotate_point(point:tuple,ang:float,centre:tuple=(0,0)):
     mod_point = len_vect(point)
@@ -59,7 +61,7 @@ class Player:
         self.friction = 0.98
         self.listener = keyboard_listener(["space"])
         self.bullets = []
-        self.bullet_speed = 450
+        self.bullet_speed = 500
         
         
 
@@ -111,8 +113,25 @@ class Player:
         self.velocity = mult_tuple(self.velocity,self.friction)
         self.position = sum_tuple(self.position,self.velocity)
         self.draw_player(turt,self.position,self.rotation,10)
+        w = wn.window_width()
+        h = wn.window_height()
+        
+        left = -w/2
+        right = w/2
+        up = h/2
+        down = -h/2
+
+
         for bullet in self.bullets:
             bullet.update(dt,asteroid_list,turt)
+            
+            
+            if bullet.outside_bounds(left,right,up,down):
+                self.bullets.remove(bullet)
+
+            if bullet.hit:
+                self.bullets.remove(bullet)
+
     
     def shoot(self):
         
@@ -126,6 +145,16 @@ class Bullet:
     def __init__(self,init_pos:tuple,vel:tuple) -> None:
         self.position = init_pos
         self.velocity = vel
+        self.hit = False
+    def outside_bounds(self,left,right,top,bottom):
+        x = self.position[0]
+        y = self.position[1]
+        if x > right or x < left:
+            return True
+        if y > top or y < bottom:
+            return True
+        return False
+        
     def update(self,dt,asteroid_list,turt):
 
         
@@ -134,6 +163,7 @@ class Bullet:
         for asteroid in asteroid_list:
             if asteroid.colliding_at_point(self.position):
                 asteroid.kill()
+                self.hit = True
         self.draw(turt)
     def draw(self,turt:turtle.Turtle):
         turt.goto(self.position)
@@ -142,19 +172,40 @@ class Bullet:
         turt.goto(self.position)
         turt.penup()
 
-
+class Asteroid_preset:
+    def __init__(self,edges = 10,rad_min=20,rad_max=40,name = "MEDIUM") -> None:
+        self.edges = edges
+        self.rad_min = rad_min
+        self.rad_max = rad_max
+        self.name = name
+    @staticmethod
+    def LARGE():
+        return Asteroid_preset(10,rad_min=35,rad_max=60,name="LARGE")
+    @staticmethod
+    def MEDIUM():
+        return Asteroid_preset(10,rad_min=20,rad_max=40,name="MEDIUM")
+    @staticmethod
+    def SMALL():
+        return Asteroid_preset(10,10,25,name="SMALL")
+    
 
 
 class Asteroid:
-    def __init__(self,position=(0,0),velocity=(10,0),edges=10,rad_min=10,rad_max=25, rot_speed=math.pi/40) -> None:
+    def __init__(self,position=(0,0),velocity=(10,0),asteroid_shape= Asteroid_preset.MEDIUM(), rot_speed=math.pi/40) -> None:
         self.points = []
+        edges = asteroid_shape.edges
+        rad_min = asteroid_shape.rad_min
+        rad_max = asteroid_shape.rad_max
+        self.shape_name = asteroid_shape.name
         for i in range(edges):
             self.points.append((random.randint(rad_min,rad_max)* math.cos((2*math.pi * i)/edges),random.randint(rad_min,rad_max)* math.sin((2*math.pi * i)/edges)))
         self.position = position
         self.velocity = velocity
         self.rotation = 0.0
         self.rot_speed = rot_speed
-        self.radius = self.calculate_radius()
+        self.radius = round(self.calculate_radius())
+        print(self.radius)
+        self.remove = False
         
     def calculate_radius(self):
         max_dist = 0
@@ -168,7 +219,6 @@ class Asteroid:
             min_dist = dist_from_origin if dist_from_origin < min_dist else min_dist
 
         return lerp(min_dist,max_dist,0.75)
-
 
 
     def update(self,dt,turt):
@@ -186,6 +236,14 @@ class Asteroid:
             turt.goto(trans_point)
         turt.goto(trans_pos)
         turt.penup()
+
+        turt.goto(sub_tuple(self.position,(0,self.radius)))
+        turt.pencolor("red")
+        turt.pendown()
+        turt.circle(self.radius)
+        turt.penup()
+        turt.pencolor("white")
+
     def colliding_at_point(self,point):
         diff_vect = sub_tuple(point,self.position)
         dist = len_vect(diff_vect)
@@ -194,10 +252,46 @@ class Asteroid:
         else:
             return False
     def kill(self):
-        print("asteroid shot")
+        #print("asteroid shot")
+        self.remove = True
 
 
         
+
+class Game:
+    def __init__(self) -> None:
+        self.asteroid_timer = 0.0
+        self.asteroids = [Asteroid((-100,0),(-5,0),Asteroid_preset.SMALL()),Asteroid((0,0),(-5,0),Asteroid_preset.MEDIUM()),Asteroid((100,0),(-5,0),Asteroid_preset.LARGE())]
+        self.player = Player()
+
+        #there sizes of 
+    def update(self,dt,turt):
+        turt.clear()
+        for asteroid in self.asteroids:
+            asteroid.update(dt,t)
+
+        self.player.update(dt,t,self.asteroids)
+
+        self.check_asteroids_shot()
+        turtle.update()
+    def check_asteroids_shot(self):
+        for asteroid in self.asteroids:
+            if asteroid.remove:
+                name = asteroid.shape_name
+                vel = asteroid.velocity
+                ang = math.atan2(vel[1],vel[0])
+                new_vel_1 = mult_tuple(vect_from_ang(ang+(math.pi/2)+deg_to_rad(random.randrange(-45,45))),random.randrange(10,30))
+                new_vel_2 = mult_tuple(vect_from_ang(ang-(math.pi/2)+deg_to_rad(random.randrange(-45,45))),random.randrange(10,30))
+                self.asteroids.remove(asteroid)
+                match name:
+                    case "LARGE":
+                        print("Large")
+                    case "MEDIUM":
+                        print("medium")
+                    case "SMALL":
+                        print("small")
+
+
 
 
 
@@ -217,31 +311,23 @@ t.hideturtle()
 
 
 
+
 wn = turtle.Screen()
 wn.bgcolor("black")
-wn.title("Turtle")
+wn.title("Asteroids")
 
-p = Player()
+
 prev_time = time.time()
 
-asteroids = [Asteroid((0,0),(-5,0))]
+game = Game()
 
 
 while True:
     dt = prev_time - time.time()
     prev_time = time.time()
 
+    game.update(dt,t)
 
-    t.clear()
-    
-    for asteroid in asteroids:
-        asteroid.update(dt,t)
-
-    p.update(dt,t,asteroids)
-
-    
-    turtle.update()
-    
     time.sleep(0.01)
     if keyboard.is_pressed("Esc"):
         break
